@@ -22,13 +22,13 @@ This project is a **work in progress**, and the `/notebooks` folder may not yet 
 
 ## Installation
 
-This project is implemented using Jupyter Notebooks and does not require local installation. You can access and execute the notebooks directly using Google Colab.  
+This project is implemented using Jupyter Notebooks and does not require local installation. You can access and execute the notebooks directly using Google Colab [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/)
+.
 
-To open a notebook in Google Colab, use the following link format:
+To open a notebook in Google Colab, use the following link: 🔗 [Open in Google Colab](https://colab.research.google.com/github/FraJoMen/GeometricRoadDesign)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/your-username/GeometricRoadDesign/blob/main/notebooks/your-notebook.ipynb)  
 
-We recommend installing the **Anaconda distribution** and downloading the files into the appropriate folder to execute them locally.  
+For local use, we recommend installing the Anaconda distribution and downloading the files into the appropriate folder to execute them locally.
 
 ## Contributing
 
