@@ -1,19 +1,23 @@
 # Geometric Road Design
 
-## Overview
-
-This project focuses on the mathematical and computational study of road geometric design, specifically:
+This project explores the mathematical and computational aspects of road geometric design, focusing on:
 
 - **Planimetric curve transitions** (horizontal alignments)  
 - **Altimetric curve transitions** (vertical alignments)  
 - **Comprehensive road design verifications**  
 
-The project is implemented using Jupyter Notebooks to facilitate both theoretical explanations and computational applications.  
+Jupyter Notebooks are used to integrate theoretical concepts with practical applications, providing computational tools for analyzing and designing road alignments effectively.
 
-## Structure
-/GeometricRoadDesign
-│── /notebooks       Contains Jupyter Notebooks with calculations and visualizations
-│── README.md        Project documentation
+The /notebooks folder contains Jupyter Notebooks developed for road geometric design.
+
+
+## Notebooks
+
+This project is a **work in progress**, and the `/notebooks` folder may not yet contain all the planned files. The expected Jupyter Notebooks include:  
+
+- **Planimetric Curve Transitions**: Study of circular arcs, clothoids, and their representation in a Cartesian plane.
+- **Altimetric Curve Transitions**: Analysis of vertical curves (concave and convex transitions).  
+- **Road Design Verification**: Computational checks for road geometry compliance.  
 
 
 ## Installation
@@ -25,18 +29,6 @@ To open a notebook in Google Colab, use the following link format:
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/your-username/GeometricRoadDesign/blob/main/notebooks/your-notebook.ipynb)  
 
 We recommend installing the **Anaconda distribution** and downloading the files into the appropriate folder to execute them locally.  
-
-## Notebooks
-
-This project is a **work in progress**, and the `/notebooks` folder may not yet contain all the planned files. The expected Jupyter Notebooks include:  
-
-- **Planimetric Curve Transitions**: Study of circular arcs, clothoids, and transition curves.  
-- **Altimetric Curve Transitions**: Analysis of vertical curves (concave and convex transitions).  
-- **Road Design Verification**: Computational checks for road geometry compliance.  
-
-## Objective
-
-Develop computational and design tools for geometric analysis of road infrastructures.  
 
 ## Contributing
 
