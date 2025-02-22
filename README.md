@@ -6,7 +6,7 @@ This project explores the mathematical and computational aspects of road geometr
 - **Altimetric curve transitions** (vertical alignments)  
 - **Comprehensive road design verifications**  
 
-Jupyter Notebooks are used to integrate theoretical concepts with practical applications, providing computational tools for analyzing and designing road alignments effectively.
+Jupyter Notebooks provide a didactic framework for exploring theoretical concepts and practical applications in road alignment analysis and design.
 
 The /notebooks folder contains Jupyter Notebooks developed for road geometric design.
 
