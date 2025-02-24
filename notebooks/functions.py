@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-
-
-@author: Francisco 
+@author: Francisco
 """
 
-
-#%%
 import numpy as np
 import plotly.graph_objects as go
-#import plotly.io as pio
 
 #%%
 class CircularTransition:
@@ -31,11 +26,14 @@ class CircularTransition:
         
         # Compute characteristic lengths
         self.T = self.R * np.tan(np.radians(self.theta_deg) / 2)
-        self.B = self.R * np.tan(np.radians(self.alpha_deg) / 2)
+        self.B = self.R / np.cos(np.radians(self.theta_deg) / 2)
         
         self.O = self.compute_circle_center()
         self.T1, self.T2 = self.compute_tangent_points()
-        
+
+        # Compute arc directly in global coordinates
+        self.arc_x, self.arc_y = self.compute_arc_coordinates()
+
         # Print parameters immediately after initialization
         self.print_parameters()
           
@@ -67,62 +65,85 @@ class CircularTransition:
         bisector = (self.v1 + self.v2)
         bisector /= np.linalg.norm(bisector)
         
-        O = self.P1 + bisector * (self.B + self.R)  # Corrected formula using bisector length B and radius R
+        O = self.P1 + bisector * self.B
         return O
     
     def compute_tangent_points(self):
         """
         Computes the tangent points T1 and T2 where the straight segments meet the circle.
         """
-        T1 = self.P1 + self.v1 * self.T  # Corrected T1 using tangent length T
-        T2 = self.P1 + self.v2 * self.T  # Corrected T2 using tangent length T
-        
+        T1 = self.P1 + self.v1 * self.T  
+        T2 = self.P1 + self.v2 * self.T  
         return T1, T2
-    
+
+    def compute_arc_coordinates(self):
+        """
+        Computes and stores the coordinates of the circular arc in the global system.
+        """
+        # Compute start and end angles
+        theta1 = np.arctan2(self.T1[1] - self.O[1], self.T1[0] - self.O[0])
+        theta2 = np.arctan2(self.T2[1] - self.O[1], self.T2[0] - self.O[0])
+
+        # Ensure correct arc direction
+        theta_center = abs(theta2 - theta1)
+        if theta_center > np.pi:
+            if theta1 < theta2:
+                theta1 += 2 * np.pi
+            else:
+                theta2 += 2 * np.pi
+
+        theta_vals = np.linspace(theta1, theta2, 100)
+        arc_x = self.O[0] + self.R * np.cos(theta_vals)
+        arc_y = self.O[1] + self.R * np.sin(theta_vals)
+
+        return arc_x, arc_y
+
     def plot(self):
         """
-        Plots the transition with relevant geometric elements.
+        Plots the transition with all elements: arc, segments, points, and vectors.
         """
-        x_coords = [self.P0[0], self.P1[0], self.P2[0], self.O[0], self.T1[0], self.T2[0]]
-        y_coords = [self.P0[1], self.P1[1], self.P2[1], self.O[1], self.T1[1], self.T2[1]]
-        
         fig = go.Figure()
-        
-        # Adding points
-        fig.add_trace(go.Scatter(x=x_coords[:-3], y=y_coords[:-3], mode='markers+text',
-                                 marker=dict(size=10, color='red'),
-                                 text=['P0', 'P1', 'P2'], textposition="top center",
-                                 name='Points'))
-        
-        # Adding circle center
-        fig.add_trace(go.Scatter(x=[self.O[0]], y=[self.O[1]], mode='markers+text',
-                                 marker=dict(size=10, color='blue'),
-                                 text=['O'], textposition="top center",
-                                 name='Circle Center'))
-        
-        # Adding tangent points
-        fig.add_trace(go.Scatter(x=[self.T1[0], self.T2[0]], y=[self.T1[1], self.T2[1]],
-                                 mode='markers+text', marker=dict(size=10, color='green'),
-                                 text=['T1', 'T2'], textposition="top center",
-                                 name='Tangent Points'))
-        
-        # Adding segment lines
-        fig.add_trace(go.Scatter(x=x_coords[:-3], y=y_coords[:-3], mode='lines',
-                                 line=dict(dash='dash', color='black'),
-                                 name='Segments'))
-        
+
+        # Add arc to plot (in blue)
+        fig.add_trace(go.Scatter(x=self.arc_x, y=self.arc_y, mode='lines', name='Circular Arc', line=dict(color='blue', width=2)))
+
+        # Add straight road segments P0P1 and P1P2 (black, dashed)
+        fig.add_trace(go.Scatter(x=[self.P0[0], self.P1[0]], y=[self.P0[1], self.P1[1]], 
+                                 mode='lines', line=dict(color='black', width=2, dash='dash'),
+                                 name='P0P1'))
+    
+        fig.add_trace(go.Scatter(x=[self.P1[0], self.P2[0]], y=[self.P1[1], self.P2[1]], 
+                                 mode='lines', line=dict(color='black', width=2, dash='dash'),
+                                 name='P1P2'))
+
+        # Add reference segments P1O, T1O, T2O (black, dashed)
+        fig.add_trace(go.Scatter(x=[self.O[0], self.P1[0]], y=[self.O[1], self.P1[1]], 
+                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
+                                 name='P1O'))
+        fig.add_trace(go.Scatter(x=[self.O[0], self.T1[0]], y=[self.O[1], self.T1[1]], 
+                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
+                                 name='T1O'))
+        fig.add_trace(go.Scatter(x=[self.O[0], self.T2[0]], y=[self.O[1], self.T2[1]], 
+                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
+                                 name='T2O'))
+
+        # Add reference points P0, P1, P2, O, T1, T2 (red markers)
+        fig.add_trace(go.Scatter(
+            x=[self.P0[0], self.P1[0], self.P2[0], self.O[0], self.T1[0], self.T2[0]],
+            y=[self.P0[1], self.P1[1], self.P2[1], self.O[1], self.T1[1], self.T2[1]],
+            mode='markers+text',
+            marker=dict(size=10, color='red'),
+            text=['P0', 'P1', 'P2', 'O', 'T1', 'T2'],
+            textposition="top center",
+            name='Reference Points'
+        ))
+
+        # Adjust plot size
+        fig.update_layout(width=900, height=700, template="plotly_white")
+
         fig.update_xaxes(scaleanchor="y", scaleratio=1)
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
-        
-        fig.update_layout(
-            title="Interactive Transition Plot", 
-            xaxis_title="X", yaxis_title="Y", 
-            template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
-        )
-        
-        fig.show()
 
-# Example usage (Uncomment to use in a script)
-# transition = CircularTransition((0, 0), (2, 2), (4, 0), 5)
-# transition.plot()
+        fig.update_layout(title="Circular Transition Plot", xaxis_title="X", yaxis_title="Y")
+
+        fig.show()
