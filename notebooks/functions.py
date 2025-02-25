@@ -40,7 +40,11 @@ class CircularTransition:
         self.P1 = np.array(P1)
         self.P2 = np.array(P2)
         self.R = R
-        
+
+        # Ensure that the points are not collinear before proceeding
+        if self.are_collinear():
+            raise ValueError("The three points are collinear. No circular transition is possible.")
+
         # Compute unit direction vectors
         self.v1 = (self.P0 - self.P1) / np.linalg.norm(self.P1 - self.P0)
         self.v2 = (self.P2 - self.P1) / np.linalg.norm(self.P2 - self.P1)
@@ -60,6 +64,18 @@ class CircularTransition:
 
         # Print parameters immediately after initialization
         self.print_parameters()
+
+    def are_collinear(self):
+        """
+        Checks if the three points defining the transition are collinear.
+        Returns True if they are, False otherwise.
+        """
+        matrix = np.array([
+            [self.P0[0], self.P0[1], 1],
+            [self.P1[0], self.P1[1], 1],
+            [self.P2[0], self.P2[1], 1]
+        ])
+        return np.abs(np.linalg.det(matrix)) < 1e-6  # Small tolerance for numerical stability
           
     def print_parameters(self):
         """
@@ -73,7 +89,7 @@ class CircularTransition:
         print(f"Bisector Length B: {self.B:.4f}")
         print(f"Circle Center (O): {self.O}")
         print(f"Tangent Points: T1 = {self.T1}, T2 = {self.T2}")
-      
+    
     def compute_intersection_angle(self):
         """
         Computes the intersection angle between two straight road segments.
@@ -104,17 +120,8 @@ class CircularTransition:
         """
         Computes and stores the coordinates of the circular arc in the global system.
         """
-        # Compute start and end angles
         theta1 = np.arctan2(self.T1[1] - self.O[1], self.T1[0] - self.O[0])
         theta2 = np.arctan2(self.T2[1] - self.O[1], self.T2[0] - self.O[0])
-
-        # Ensure correct arc direction
-        theta_center = abs(theta2 - theta1)
-        if theta_center > np.pi:
-            if theta1 < theta2:
-                theta1 += 2 * np.pi
-            else:
-                theta2 += 2 * np.pi
 
         theta_vals = np.linspace(theta1, theta2, 100)
         arc_x = self.O[0] + self.R * np.cos(theta_vals)
