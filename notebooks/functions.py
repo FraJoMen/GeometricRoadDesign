@@ -1,6 +1,30 @@
 # -*- coding: utf-8 -*-
 """
-@author: Francisco
+GeometricRoadDesign - Road Design Functions
+===========================================
+
+This module is part of the GeometricRoadDesign project and provides tools 
+for analyzing and designing road alignments, including:
+
+1. **Planimetric Curve Transitions**
+   - Circular transitions between straight road sections.
+   - Future development: Clothoid-based transitions.
+
+2. **Altimetric Curve Transitions (Vertical Alignments)**
+   - Implementation planned.
+
+3. **Complete Road Design Verification**
+   - Future tools for checking geometric and regulatory compliance.
+
+Current Implementation:
+-----------------------
+- `CircularTransition`: Computes the geometric parameters of a circular transition 
+  (radii, intersection angles, tangent lengths, bisectors) and generates a visualization.
+
+This module is designed for scalability, allowing future expansion with additional 
+road design tools.
+
+Author: Francisco
 """
 
 import numpy as np
