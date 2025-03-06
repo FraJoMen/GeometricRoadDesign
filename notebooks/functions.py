@@ -304,3 +304,74 @@ class CircularTransition:
         
         # Return a new CircularTransition instance with the computed radius
         return CircularTransition(P0, P1, P2, R_star), PA, PB
+    
+#%% 
+    def plotClothoidCenters(self, A1, A2, num_samples=20):
+        """
+        Method to calculate and visualize the centerlines defining the points CC1* and CC2* using Plotly.
+        
+        Parameters:
+        - A1: Entry clothoid parameter.
+        - A2: Exit clothoid parameter.
+        - num_samples: Number of sampled points along P0P1 and P1P2.
+        """
+
+        # Create points T1* and T2* along P0P1 and P1P2
+        t_values = np.linspace(0.1, 0.9, num_samples)  # Avoid extreme values 0 and 1
+        T1_samples = [self.P0 + t * (self.P1 - self.P0) for t in t_values]
+        T2_samples = [self.P1 + t * (self.P2 - self.P1) for t in t_values]
+
+        CC1_samples = []
+        CC2_samples = []
+
+        # Placeholder function to compute the circle center relative to T1*
+        def compute_CC1(T1, A1):
+            return T1 + np.array([0, A1])  # Dummy offset for visualization
+
+        # Placeholder function to compute the circle center relative to T2*
+        def compute_CC2(T2, A2):
+            return T2 + np.array([0, -A2])  # Dummy offset for visualization
+
+        # Compute CC1* and CC2* points
+        for T1 in T1_samples:
+            CC1_samples.append(compute_CC1(T1, A1))
+
+        for T2 in T2_samples:
+            CC2_samples.append(compute_CC2(T2, A2))
+
+        # Convert to arrays for plotting
+        CC1_samples = np.array(CC1_samples)
+        CC2_samples = np.array(CC2_samples)
+
+        # Create Plotly figure
+        fig = go.Figure()
+
+        # Add CC1* and CC2* centerlines as dashed lines
+        fig.add_trace(go.Scatter(x=CC1_samples[:, 0], y=CC1_samples[:, 1],
+                                 mode='lines+markers',
+                                 line=dict(color='red', width=2, dash='dash'),
+                                 name="Centerlines CC1* (Entry Clothoid)"))
+
+        fig.add_trace(go.Scatter(x=CC2_samples[:, 0], y=CC2_samples[:, 1],
+                                 mode='lines+markers',
+                                 line=dict(color='blue', width=2, dash='dash'),
+                                 name="Centerlines CC2* (Exit Clothoid)"))
+
+        # Add segments P0P1 and P1P2
+        fig.add_trace(go.Scatter(x=[self.P0[0], self.P1[0]], y=[self.P0[1], self.P1[1]],
+                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
+                                 name="Segment P0P1"))
+        
+        fig.add_trace(go.Scatter(x=[self.P1[0], self.P2[0]], y=[self.P1[1], self.P2[1]],
+                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
+                                 name="Segment P1P2"))
+
+        # Layout settings
+        fig.update_layout(title="Centerline Distributions for CC1* and CC2*",
+                          xaxis_title="X", yaxis_title="Y",
+                          width=900, height=700, template="plotly_white")
+        
+        fig.update_xaxes(scaleanchor="y", scaleratio=1)
+        fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+        fig.show()
