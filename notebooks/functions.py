@@ -22,6 +22,7 @@ Author: Francisco
 
 import numpy as np
 import plotly.graph_objects as go
+from scipy.special import fresnel
 
 class CircularTransition:
     """
@@ -306,6 +307,61 @@ class CircularTransition:
         return CircularTransition(P0, P1, P2, R_star), PA, PB
     
 #%% 
+    def clothoid_point(self, t, A):
+        """Computes the clothoid point at parameter t."""
+        S, C = fresnel(t)
+        x = A * C
+        y = A * S
+        return np.array([x, y])
+
+    def tangent_vector(self, t, A):
+        """Computes the tangent unit vector at parameter t."""
+        dx_dt = A * np.cos(np.pi * t**2 / 2)
+        dy_dt = A * np.sin(np.pi * t**2 / 2)
+        T = np.array([dx_dt, dy_dt])
+        return T / np.linalg.norm(T)
+
+    def normal_vector(self, tangent):
+        """Computes the normal unit vector from the tangent."""
+        return np.array([-tangent[1], tangent[0]])
+    
+    def rotation_matrix(self, angle):
+        """Returns a 2D rotation matrix for a given angle."""
+        return np.array([[np.cos(angle), -np.sin(angle)],
+                         [np.sin(angle), np.cos(angle)]])
+
+    def compute_CC1(self, T1, A1):
+        """Computes the center of the osculating circle at the end of the entry clothoid."""
+        L = A1 / (self.R * np.pi)
+        theta = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])
+        R_matrix = self.rotation_matrix(theta)
+        
+        # Compute in local coordinates
+        Tf1_local = self.clothoid_point(L / A1, A1)
+        T_end = self.tangent_vector(L / A1, A1)
+        N_end_local = self.normal_vector(T_end)
+        CC1_local = Tf1_local + self.R * N_end_local
+        
+        # Transform to global coordinates
+        CC1_global = T1 + R_matrix @ CC1_local
+        return CC1_global
+
+    def compute_CC2(self, T2, A2):
+        """Computes the center of the osculating circle at the end of the exit clothoid."""
+        L = A2 / (self.R * np.pi)
+        theta = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])
+        R_matrix = self.rotation_matrix(theta)
+        
+        # Compute in local coordinates
+        Tf2_local = self.clothoid_point(L / A2, A2)
+        T_end = self.tangent_vector(L / A2, A2)
+        N_end_local = self.normal_vector(T_end)
+        CC2_local = Tf2_local + self.R * N_end_local
+        
+        # Transform to global coordinates
+        CC2_global = T2 + R_matrix @ CC2_local
+        return CC2_global
+
     def plotClothoidCenters(self, A1, A2, num_samples=20):
         """
         Method to calculate and visualize the centerlines defining the points CC1* and CC2* using Plotly.
@@ -315,38 +371,19 @@ class CircularTransition:
         - A2: Exit clothoid parameter.
         - num_samples: Number of sampled points along P0P1 and P1P2.
         """
-
         # Create points T1* and T2* along P0P1 and P1P2
         t_values = np.linspace(0.1, 0.9, num_samples)  # Avoid extreme values 0 and 1
         T1_samples = [self.P0 + t * (self.P1 - self.P0) for t in t_values]
         T2_samples = [self.P1 + t * (self.P2 - self.P1) for t in t_values]
 
-        CC1_samples = []
-        CC2_samples = []
+        CC1_samples = [self.compute_CC1(T1, A1) for T1 in T1_samples]
+        CC2_samples = [self.compute_CC2(T2, A2) for T2 in T2_samples]
 
-        # Placeholder function to compute the circle center relative to T1*
-        def compute_CC1(T1, A1):
-            return T1 + np.array([0, A1])  # Dummy offset for visualization
-
-        # Placeholder function to compute the circle center relative to T2*
-        def compute_CC2(T2, A2):
-            return T2 + np.array([0, -A2])  # Dummy offset for visualization
-
-        # Compute CC1* and CC2* points
-        for T1 in T1_samples:
-            CC1_samples.append(compute_CC1(T1, A1))
-
-        for T2 in T2_samples:
-            CC2_samples.append(compute_CC2(T2, A2))
-
-        # Convert to arrays for plotting
         CC1_samples = np.array(CC1_samples)
         CC2_samples = np.array(CC2_samples)
 
         # Create Plotly figure
         fig = go.Figure()
-
-        # Add CC1* and CC2* centerlines as dashed lines
         fig.add_trace(go.Scatter(x=CC1_samples[:, 0], y=CC1_samples[:, 1],
                                  mode='lines+markers',
                                  line=dict(color='red', width=2, dash='dash'),
@@ -357,7 +394,6 @@ class CircularTransition:
                                  line=dict(color='blue', width=2, dash='dash'),
                                  name="Centerlines CC2* (Exit Clothoid)"))
 
-        # Add segments P0P1 and P1P2
         fig.add_trace(go.Scatter(x=[self.P0[0], self.P1[0]], y=[self.P0[1], self.P1[1]],
                                  mode='lines', line=dict(color='black', width=2, dash='dot'),
                                  name="Segment P0P1"))
@@ -366,12 +402,11 @@ class CircularTransition:
                                  mode='lines', line=dict(color='black', width=2, dash='dot'),
                                  name="Segment P1P2"))
 
-        # Layout settings
         fig.update_layout(title="Centerline Distributions for CC1* and CC2*",
                           xaxis_title="X", yaxis_title="Y",
                           width=900, height=700, template="plotly_white")
         
         fig.update_xaxes(scaleanchor="y", scaleratio=1)
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
-
         fig.show()
+
