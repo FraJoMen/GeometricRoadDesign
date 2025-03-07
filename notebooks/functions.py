@@ -38,6 +38,10 @@ class CircularTransition:
         if self.areCollinear(self.P0, self.P1, self.P2):
             raise ValueError("The three points are collinear. No circular transition is possible.")
         
+        # Determine if the curve is traversed in a clockwise or counterclockwise direction
+        # This information is crucial for correctly computing clothoid quadrants and orientations
+        self.is_clockwise = self.is_clockwise = self.check_curve_direction(self.P0, self.P1, self.P2)
+        
         # Compute unit direction vectors
         self.v1 = (self.P0 - self.P1) / np.linalg.norm(self.P1 - self.P0)
         self.v2 = (self.P2 - self.P1) / np.linalg.norm(self.P2 - self.P1)
@@ -54,6 +58,11 @@ class CircularTransition:
  
         # Compute arc directly in global coordinates
         self.arc_x, self.arc_y = self.ComputeArcCoordinates()
+        
+        # **New attributes for clothoids**
+        self.clothoid_entry_global = None  # Stores the global coordinates of the entry clothoid
+        self.clothoid_exit_global = None   # Stores the global coordinates of the exit clothoid
+
 
         # Print parameters immediately after initialization
         self.PrintParameters()
@@ -66,7 +75,21 @@ class CircularTransition:
         # Calculate the area of the triangle formed by the points
         area = 0.5 * np.linalg.norm(np.cross(P1 - P0, P2 - P0))
         return np.isclose(area, 0)
-
+    
+    @staticmethod
+    def check_curve_direction(P0, P1, P2):
+        """
+        Determines if the curve is traversed in a clockwise or counterclockwise direction.
+        
+        Parameters:
+            P0, P1, P2 (np.array): Three points defining the road transition.
+    
+        Returns:
+            bool: True if the curve is clockwise, False if counterclockwise.
+        """
+        cross_product = np.cross(P1 - P0, P2 - P1)
+        return cross_product < 0  # True if clockwise, False if counterclockwise
+  
     @staticmethod
     def isInsideTriangle(P0, P1, P2, Pc):
         """
@@ -307,106 +330,192 @@ class CircularTransition:
         return CircularTransition(P0, P1, P2, R_star), PA, PB
     
 #%% 
-    def clothoid_point(self, t, A):
-        """Computes the clothoid point at parameter t."""
-        S, C = fresnel(t)
-        x = A * C
-        y = A * S
-        return np.array([x, y])
 
-    def tangent_vector(self, t, A):
-        """Computes the tangent unit vector at parameter t."""
-        dx_dt = A * np.cos(np.pi * t**2 / 2)
-        dy_dt = A * np.sin(np.pi * t**2 / 2)
-        T = np.array([dx_dt, dy_dt])
-        return T / np.linalg.norm(T)
-
-    def normal_vector(self, tangent):
-        """Computes the normal unit vector from the tangent."""
-        return np.array([-tangent[1], tangent[0]])
+    def compute_clothoid_coordinates(self, A, is_entry):
+        """
+        Computes the clothoid points in the local reference system considering direction and quadrant.
     
-    def rotation_matrix(self, angle):
-        """Returns a 2D rotation matrix for a given angle."""
-        return np.array([[np.cos(angle), -np.sin(angle)],
-                         [np.sin(angle), np.cos(angle)]])
-
-    def compute_CC1(self, T1, A1):
-        """Computes the center of the osculating circle at the end of the entry clothoid."""
-        L = A1 / (self.R * np.pi)
-        theta = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])
-        R_matrix = self.rotation_matrix(theta)
-        
-        # Compute in local coordinates
-        Tf1_local = self.clothoid_point(L / A1, A1)
-        T_end = self.tangent_vector(L / A1, A1)
-        N_end_local = self.normal_vector(T_end)
-        CC1_local = Tf1_local + self.R * N_end_local
-        
-        # Transform to global coordinates
-        CC1_global = T1 + R_matrix @ CC1_local
-        return CC1_global
-
-    def compute_CC2(self, T2, A2):
-        """Computes the center of the osculating circle at the end of the exit clothoid."""
-        L = A2 / (self.R * np.pi)
-        theta = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])
-        R_matrix = self.rotation_matrix(theta)
-        
-        # Compute in local coordinates
-        Tf2_local = self.clothoid_point(L / A2, A2)
-        T_end = self.tangent_vector(L / A2, A2)
-        N_end_local = self.normal_vector(T_end)
-        CC2_local = Tf2_local + self.R * N_end_local
-        
-        # Transform to global coordinates
-        CC2_global = T2 + R_matrix @ CC2_local
-        return CC2_global
-
-    def plotClothoidCenters(self, A1, A2, num_samples=20):
-        """
-        Method to calculate and visualize the centerlines defining the points CC1* and CC2* using Plotly.
-        
         Parameters:
-        - A1: Entry clothoid parameter.
-        - A2: Exit clothoid parameter.
-        - num_samples: Number of sampled points along P0P1 and P1P2.
+            A (float): Clothoid parameter (A1 for entry, A2 for exit).
+            is_entry (bool): True for entry clothoid, False for exit clothoid.
+    
+        Returns:
+            np.ndarray: Clothoid coordinates (x', y') in the local reference system.
         """
-        # Create points T1* and T2* along P0P1 and P1P2
-        t_values = np.linspace(0.1, 0.9, num_samples)  # Avoid extreme values 0 and 1
-        T1_samples = [self.P0 + t * (self.P1 - self.P0) for t in t_values]
-        T2_samples = [self.P1 + t * (self.P2 - self.P1) for t in t_values]
+        # Define clothoid length based on curvature radius
+        L = A / (self.R * np.pi)  # Approximate clothoid length
+        t_values = np.linspace(0, L / A, 100)  # Parameter values along the clothoid
+    
+        # Compute Fresnel integrals
+        S, C = fresnel(t_values)
+    
+        # Compute clothoid coordinates in the local reference system
+        x_local = A * C
+        y_local = A * S
+    
+        # Determine correct quadrants for entry and exit clothoids
+        if self.is_clockwise:
+            if is_entry:
+                direction_x = 1
+                direction_y = -1  # Entry clothoid in the **fourth quadrant**
+            else:
+                direction_x = -1
+                direction_y = -1  # Exit clothoid in the **third quadrant**
+        else:
+            if is_entry:
+                direction_x = 1
+                direction_y = 1  # Entry clothoid in the **first quadrant**
+            else:
+                direction_x = -1
+                direction_y = 1  # Exit clothoid in the **second quadrant**
+    
+        # Apply correct signs based on quadrants
+        x_local *= direction_x
+        y_local *= direction_y
+    
+        # Print final clothoid coordinate for verification
+        print(f"Final clothoid coordinate ({'Entry' if is_entry else 'Exit'}): x' = {x_local[-1]:.4f}, y' = {y_local[-1]:.4f}")
+    
+        return np.vstack((x_local, y_local)).T  # Return as (N,2) array
 
-        CC1_samples = [self.compute_CC1(T1, A1) for T1 in T1_samples]
-        CC2_samples = [self.compute_CC2(T2, A2) for T2 in T2_samples]
+    def add_clothoids(self, A1, A2):
+        """
+        Computes and stores the clothoid transition curves in the object's attributes.
+        """
+        print("\nComputing clothoid transition curves...")
+    
+        # Compute clothoid coordinates in local reference systems
+        clothoid_entry_local = self.compute_clothoid_coordinates(A1, is_entry=True)
+        clothoid_exit_local = self.compute_clothoid_coordinates(A2, is_entry=False)
+    
+        ### ENTRY CLOTHOID ###
+        mid_P0P1 = (self.P0 + self.P1) / 2  # Midpoint of P0P1
+        theta_P0P1 = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])  # Angle of P0P1
+    
+        print(f"[DEBUG] Mid_P0P1: {mid_P0P1}, θ_P0P1: {np.degrees(theta_P0P1):.2f}°")
+    
+        # **Ensure correct rotation direction**
+        R_entry = np.array([
+            [np.cos(theta_P0P1), -np.sin(theta_P0P1)],
+            [np.sin(theta_P0P1), np.cos(theta_P0P1)]
+        ])
+    
+        # Apply rotation + translation
+        self.clothoid_entry_global = (R_entry @ clothoid_entry_local.T).T + mid_P0P1
+    
+        ### EXIT CLOTHOID ###
+        mid_P1P2 = (self.P1 + self.P2) / 2  # Midpoint of P1P2
+        theta_P1P2 = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])  # Angle of P1P2
+    
+        print(f"[DEBUG] Mid_P1P2: {mid_P1P2}, θ_P1P2: {np.degrees(theta_P1P2):.2f}°")
+    
+        # **Ensure correct rotation direction**
+        R_exit = np.array([
+            [np.cos(theta_P1P2), -np.sin(theta_P1P2)],
+            [np.sin(theta_P1P2), np.cos(theta_P1P2)]
+        ])
+    
+        # Apply rotation + translation
+        self.clothoid_exit_global = (R_exit @ clothoid_exit_local.T).T + mid_P1P2
+    
+        print("Clothoid computation completed.\n")
 
-        CC1_samples = np.array(CC1_samples)
-        CC2_samples = np.array(CC2_samples)
-
-        # Create Plotly figure
+    def plotClothoid(self):
+        """
+        Plots the clothoid transition including:
+        - Road segments (P0P1 and P1P2)
+        - Circular arc
+        - Reference points (P0, P1, P2, O, T1, T2)
+        - Local coordinate axes (x', y') and (x'', y'')
+        - Entry and exit clothoids (positioned at midpoints of P0P1 and P1P2 for now)
+        """
+        # Check if clothoids have been computed before plotting
+        if self.clothoid_entry_global is None or self.clothoid_exit_global is None:
+            raise ValueError("Clothoids have not been computed. Call add_clothoids(A1, A2) before plotting.")
+    
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=CC1_samples[:, 0], y=CC1_samples[:, 1],
-                                 mode='lines+markers',
-                                 line=dict(color='red', width=2, dash='dash'),
-                                 name="Centerlines CC1* (Entry Clothoid)"))
-
-        fig.add_trace(go.Scatter(x=CC2_samples[:, 0], y=CC2_samples[:, 1],
-                                 mode='lines+markers',
-                                 line=dict(color='blue', width=2, dash='dash'),
-                                 name="Centerlines CC2* (Exit Clothoid)"))
-
+    
+        # Draw the circular arc
+        fig.add_trace(go.Scatter(x=self.arc_x, y=self.arc_y, mode='lines', 
+                                 name='Circular Arc', line=dict(color='blue', width=2)))
+    
+        # Draw road segments P0P1 and P1P2 (dashed black lines)
         fig.add_trace(go.Scatter(x=[self.P0[0], self.P1[0]], y=[self.P0[1], self.P1[1]],
-                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
-                                 name="Segment P0P1"))
+                                 mode='lines', line=dict(color='black', width=2, dash='dash'),
+                                 name='Segment P0P1'))
         
         fig.add_trace(go.Scatter(x=[self.P1[0], self.P2[0]], y=[self.P1[1], self.P2[1]],
-                                 mode='lines', line=dict(color='black', width=2, dash='dot'),
-                                 name="Segment P1P2"))
-
-        fig.update_layout(title="Centerline Distributions for CC1* and CC2*",
+                                 mode='lines', line=dict(color='black', width=2, dash='dash'),
+                                 name='Segment P1P2'))
+    
+        # Draw key reference points (P0, P1, P2, O, T1, T2)
+        fig.add_trace(go.Scatter(
+            x=[self.P0[0], self.P1[0], self.P2[0], self.O[0], self.T1[0], self.T2[0]],
+            y=[self.P0[1], self.P1[1], self.P2[1], self.O[1], self.T1[1], self.T2[1]],
+            mode='markers+text',
+            marker=dict(size=10, color='red'),
+            text=['P0', 'P1', 'P2', 'O', 'T1', 'T2'],
+            textposition="top center",
+            name='Reference Points'
+        ))
+    
+        # Compute midpoints of P0P1 and P1P2 for temporary clothoid placement
+        mid_P0P1 = (self.P0 + self.P1) / 2
+        mid_P1P2 = (self.P1 + self.P2) / 2
+    
+        # Compute direction vectors
+        P0P1_dir = (self.P1 - self.P0) / np.linalg.norm(self.P1 - self.P0)
+        P1P2_dir = (self.P2 - self.P1) / np.linalg.norm(self.P2 - self.P1)
+    
+        # Compute perpendicular (normal) vectors for local coordinate systems
+        normal_P0P1 = np.array([-P0P1_dir[1], P0P1_dir[0]])  # 90° rotated for y'
+        normal_P1P2 = np.array([-P1P2_dir[1], P1P2_dir[0]])  # 90° rotated for y''
+    
+        # Define the axis length for visualization
+        axis_length = 15  # Increase this to make the axes more visible
+    
+        # Draw x' and y' centered at mid_P0P1
+        fig.add_trace(go.Scatter(x=[mid_P0P1[0], mid_P0P1[0] + axis_length * P0P1_dir[0]], 
+                                 y=[mid_P0P1[1], mid_P0P1[1] + axis_length * P0P1_dir[1]],
+                                 mode='lines', line=dict(color='orange', width=2, dash='dot'),
+                                 name="x' (Local Axis P0P1)"))
+    
+        fig.add_trace(go.Scatter(x=[mid_P0P1[0], mid_P0P1[0] + axis_length * normal_P0P1[0]], 
+                                 y=[mid_P0P1[1], mid_P0P1[1] + axis_length * normal_P0P1[1]],
+                                 mode='lines', line=dict(color='orange', width=2, dash='dot'),
+                                 name="y' (Local Axis P0P1)"))
+    
+        # Draw x'' and y'' centered at mid_P1P2
+        fig.add_trace(go.Scatter(x=[mid_P1P2[0], mid_P1P2[0] + axis_length * P1P2_dir[0]], 
+                                 y=[mid_P1P2[1], mid_P1P2[1] + axis_length * P1P2_dir[1]],
+                                 mode='lines', line=dict(color='orange', width=2, dash='dot'),
+                                 name="x'' (Local Axis P1P2)"))
+    
+        fig.add_trace(go.Scatter(x=[mid_P1P2[0], mid_P1P2[0] + axis_length * normal_P1P2[0]], 
+                                 y=[mid_P1P2[1], mid_P1P2[1] + axis_length * normal_P1P2[1]],
+                                 mode='lines', line=dict(color='orange', width=2, dash='dot'),
+                                 name="y'' (Local Axis P1P2)"))
+    
+    
+        # Draw temporary clothoids at midpoints with scaling
+        fig.add_trace(go.Scatter(x=self.clothoid_entry_global[:, 0], 
+                                 y=self.clothoid_entry_global[:, 1],
+                                 mode='lines', line=dict(color='red', width=3, dash='dot'), 
+                                 name="Temp Entry Clothoid (Scaled)"))
+    
+        fig.add_trace(go.Scatter(x=self.clothoid_exit_global[:, 0], 
+                                 y=self.clothoid_exit_global[:, 1],
+                                 mode='lines', line=dict(color='red', width=3, dash='dot'), 
+                                 name="Temp Exit Clothoid (Scaled)"))
+    
+        # Layout settings
+        fig.update_layout(title="Clothoid Transition (Temp Clothoids at Midpoints - Scaled)",
                           xaxis_title="X", yaxis_title="Y",
                           width=900, height=700, template="plotly_white")
-        
+    
+        # Ensure equal axis scaling
         fig.update_xaxes(scaleanchor="y", scaleratio=1)
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    
         fig.show()
 

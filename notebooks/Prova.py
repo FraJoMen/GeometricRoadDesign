@@ -20,11 +20,11 @@ def versore_normale(tangente):
     return N
 
 # Parametri
-A = 1
-R = 0.8
-L = A/(R*np.pi)
+A = 5
+R = 2
+L = A**2/(R)
 
-t = np.linspace(0, L/A, 100)
+t = np.linspace(0, L**2/(2*A**2), 100)
 
 # Genera i punti della clotoide
 x, y = clotoide(t, A)
