@@ -85,18 +85,9 @@ class CircularTransition:
     def ComputeArcCoordinates(self):
         theta1 = np.arctan2(self.T1[1] - self.O[1], self.T1[0] - self.O[0])
         theta2 = np.arctan2(self.T2[1] - self.O[1], self.T2[0] - self.O[0])
-
-        theta_center = abs(theta2 - theta1)
-        if theta_center > np.pi:
-            if theta1 < theta2:
-                theta1 += 2 * np.pi
-            else:
-                theta2 += 2 * np.pi
-
         theta_vals = np.linspace(theta1, theta2, 100)
         arc_x = self.O[0] + self.R * np.cos(theta_vals)
         arc_y = self.O[1] + self.R * np.sin(theta_vals)
-
         return arc_x, arc_y
     
     @staticmethod
@@ -354,26 +345,26 @@ class CircularTransition:
         print("\nComputing clothoid transition curves...")
     
         # Local clothoid coordinates from Fresnel integrals
-        clothoid_entry_local = self.compute_clothoid_coordinates(A1, is_entry=True)
-        clothoid_exit_local = self.compute_clothoid_coordinates(A2, is_entry=False)
+        #clothoid_entry_local = self.compute_clothoid_coordinates(A1, is_entry=True)
+        #clothoid_exit_local = self.compute_clothoid_coordinates(A2, is_entry=False)
     
         # ENTRY clothoid: local system aligned with P0-P1
-        mid_P0P1 = (self.P0 + self.P1) / 2
-        theta_P0P1 = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])
-        R_entry = np.array([
-            [np.cos(theta_P0P1), -np.sin(theta_P0P1)],
-            [np.sin(theta_P0P1),  np.cos(theta_P0P1)]
-        ])
-        self.clothoid_entry_global = (R_entry @ clothoid_entry_local.T).T + mid_P0P1
+        #mid_P0P1 = (self.P0 + self.P1) / 2
+        #theta_P0P1 = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])
+        #R_entry = np.array([
+        #    [np.cos(theta_P0P1), -np.sin(theta_P0P1)],
+        #    [np.sin(theta_P0P1),  np.cos(theta_P0P1)]
+        #])
+        #self.clothoid_entry_global = (R_entry @ clothoid_entry_local.T).T + mid_P0P1
     
         # EXIT clothoid: local system aligned with P1-P2
-        mid_P1P2 = (self.P1 + self.P2) / 2
-        theta_P1P2 = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])
-        R_exit = np.array([
-            [np.cos(theta_P1P2), -np.sin(theta_P1P2)],
-            [np.sin(theta_P1P2),  np.cos(theta_P1P2)]
-        ])
-        self.clothoid_exit_global = (R_exit @ clothoid_exit_local.T).T + mid_P1P2
+        #mid_P1P2 = (self.P1 + self.P2) / 2
+        #theta_P1P2 = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])
+        #R_exit = np.array([
+        #    [np.cos(theta_P1P2), -np.sin(theta_P1P2)],
+        #    [np.sin(theta_P1P2),  np.cos(theta_P1P2)]
+        #])
+        #self.clothoid_exit_global = (R_exit @ clothoid_exit_local.T).T + mid_P1P2
     
         # Compute ΔR offsets
         delta_R1 = self.compute_delta_R(A1, self.R)
@@ -401,54 +392,50 @@ class CircularTransition:
             lambdas = np.linalg.solve(A_mat, b_vec)
             O_star = P_offset1 + lambdas[0] * self.v1
             self.O_star = O_star
-            self.offset_line1 = (P_offset1 - 80 * self.v1, P_offset1 + 80 * self.v1)
-            self.offset_line2 = (P_offset2 - 80 * self.v2, P_offset2 + 80 * self.v2)
+            self.offset_line1 = (O_star - self.R * self.v1, O_star + self.R * self.v1)
+            self.offset_line2 = (O_star - self.R * self.v2, O_star + self.R * self.v2)
             print(f"[INFO] Corrected center O* computed: {O_star}")
         except np.linalg.LinAlgError:
             print("[ERROR] Unable to compute corrected center O*. Lines are parallel.")
             self.O_star = None
             self.offset_line1 = None
-            self.offset_line2 = None
-            
+            self.offset_line2 = None 
+        
         # === CORRECTED ARC ===
         if self.O_star is not None:
-            # Clothoid lengths and characteristic angles
+            # Clothoid lengths and angles
             L1 = A1**2 / self.R
             L2 = A2**2 / self.R
             tau1 = L1 / (2 * self.R)
             tau2 = L2 / (2 * self.R)
         
-            # Use precomputed inward normal vectors
-            angle1 = np.arctan2(self.normal1[1], self.normal1[0])
-            angle2 = np.arctan2(self.normal2[1], self.normal2[0])
+            # Compute angles of the reversed normal vectors
+            angle1 = np.arctan2(-self.normal1[1], -self.normal1[0])
+            angle2 = np.arctan2(-self.normal2[1], -self.normal2[0])
         
-            # Define start and end angles
-            theta_start = angle1 - tau1  # ingresso
-            theta_end   = angle2 + tau2  # uscita
-        
-            # Ensure correct plotting direction based on curve orientation
+            # Adjust angles by clothoid deflection
             if self.is_clockwise:
-                theta_vals = np.linspace(theta_end, theta_start, 100)  # clockwise: decreasing
+                theta_start = angle1 - tau1
+                theta_end = angle2 + tau2
             else:
-                theta_vals = np.linspace(theta_start, theta_end, 100)  # counterclockwise: increasing
+                theta_start = angle1 + tau1
+                theta_end = angle2 - tau2
         
-            # Save corrected arc
+            # Generate arc
+            theta_vals = np.linspace(theta_start, theta_end, 100)
             self.arc_x_star = self.O_star[0] + self.R * np.cos(theta_vals)
             self.arc_y_star = self.O_star[1] + self.R * np.sin(theta_vals)
         
-            theta_star = abs(theta_end - theta_start)
+            theta_star = theta_end - theta_start
             print(f"[INFO] Corrected arc generated with angle θ* = {np.degrees(theta_star):.2f}°")
         else:
             self.arc_x_star = None
             self.arc_y_star = None
 
 
-        print("Clothoid computation completed.\n")
-
-
     def plotClothoid(self):
-        if self.clothoid_entry_global is None or self.clothoid_exit_global is None:
-            raise ValueError("Clothoids not computed. Call add_clothoids(A1, A2) first.")
+        #if self.clothoid_entry_global is None or self.clothoid_exit_global is None:
+        #    raise ValueError("Clothoids not computed. Call add_clothoids(A1, A2) first.")
     
         fig = go.Figure()
     
@@ -459,11 +446,11 @@ class CircularTransition:
         fig.add_trace(go.Scatter(x=[self.P1[0], self.P2[0]], y=[self.P1[1], self.P2[1]],
                                  mode='lines', name='Segment P1-P2', line=dict(color='black', dash='dash')))
     
-        # Clothoid curves
-        fig.add_trace(go.Scatter(x=self.clothoid_entry_global[:, 0], y=self.clothoid_entry_global[:, 1],
-                                 mode='lines', name='Entry Clothoid', line=dict(color='red', dash='dot')))
-        fig.add_trace(go.Scatter(x=self.clothoid_exit_global[:, 0], y=self.clothoid_exit_global[:, 1],
-                                 mode='lines', name='Exit Clothoid', line=dict(color='red', dash='dot')))
+        ## Clothoid curves
+        #fig.add_trace(go.Scatter(x=self.clothoid_entry_global[:, 0], y=self.clothoid_entry_global[:, 1],
+        #                         mode='lines', name='Entry Clothoid', line=dict(color='red', dash='dot')))
+        #fig.add_trace(go.Scatter(x=self.clothoid_exit_global[:, 0], y=self.clothoid_exit_global[:, 1],
+        #                         mode='lines', name='Exit Clothoid', line=dict(color='red', dash='dot')))
     
         # Reference points
         labels = ['P0', 'P1', 'P2', 'O', 'T1', 'T2']
