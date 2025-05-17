@@ -10,25 +10,40 @@ Jupyter Notebooks provide a didactic framework for exploring theoretical concept
 
 The /notebooks folder contains Jupyter Notebooks developed for road geometric design.
 
-
 ## Notebooks
 
-This project is a **work in progress**, and the `/notebooks` folder may not yet contain all the planned files. The expected Jupyter Notebooks include:  
+This project is a **work in progress**, and the `/notebooks` folder may not yet contain all the planned files. The current and expected Jupyter Notebooks include:  
 
 - **Planimetric Curve Transitions**: Study of circular arcs, clothoids, and their representation in a Cartesian plane.
-- **Altimetric Curve Transitions**: Analysis of vertical curves (concave and convex transitions).  
-- **Road Design Verification**: Computational checks for road geometry compliance.  
-
+- **Altimetric Curve Transitions** *(in progress)*: Analysis of vertical curves (concave and convex transitions).  
+- **Advanced Curve Transitions** *(planned)*: More complex configurations involving consecutive curves in the same or opposite direction, including flexure clothoids and minimum separation conditions.
+- **Road Design Verification** *(planned)*: Computational checks for road geometry compliance.  
+  
 
 ## Installation
 
-This project is implemented using Jupyter Notebooks and does not require local installation. You can access and execute the notebooks directly using Google Colab [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/)
-.
+This project is based on Jupyter Notebooks and requires no formal installation.  
+We recommend using the [Anaconda distribution](https://www.anaconda.com/) to ensure access to the necessary scientific Python libraries such as `numpy`, `plotly`, and `matplotlib`.
 
-To open a notebook in Google Colab, use the following link: 🔗 [Open in Google Colab](https://colab.research.google.com/github/FraJoMen/GeometricRoadDesign)
+To use the project locally:
 
+1. Clone or download this repository.
+2. Open the desired notebook from the `/notebooks` folder in your local Jupyter environment.
 
-For local use, we recommend installing the Anaconda distribution and downloading the files into the appropriate folder to execute them locally.
+All notebooks are designed to run independently and provide a self-contained environment for exploring geometric road design concepts.
+
+## Python Modules
+
+The core functionalities for geometric road alignment computations are implemented in the `functions.py` module, which defines reusable classes and tools for use across multiple notebooks.
+
+Currently implemented:
+
+- `CircularTransition`: handles geometric transitions between straight segments using circular arcs and clothoids. Includes:
+  - Geometry construction (intersection angles, circle center, tangent points)
+  - Clothoid generation and curvature correction
+  - Visualizations using Plotly
+  - Convergence analysis for clothoid series expansions
+  
 
 ## Contributing
 
