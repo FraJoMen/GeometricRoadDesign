@@ -23,6 +23,7 @@ import plotly.graph_objects as go
 from scipy.special import fresnel
 
 
+
 class CircularTransition:
     def __init__(self, P0, P1, P2, R):
         self.P0 = np.array(P0)
@@ -324,146 +325,221 @@ class CircularTransition:
         if contributo_terzo is not None:
             print(f"\n[INFO] Contributo del 3° termine: {contributo_terzo:.9e} m")
 
-    def compute_clothoid_coordinates(self, A, is_entry):
-        L = A / (self.R * np.pi)
-        t_values = np.linspace(0, L / A, 100)
-        S, C = fresnel(t_values)
-        x_local = A * C
-        y_local = A * S
 
+    @staticmethod
+    def compute_Xm(A, R, n_terms=10):
+        """
+        Computes the midpoint coordinate Xm of the clothoid using a series approximation.
+    
+        Parameters:
+            A (float): Clothoid parameter.
+            R (float): Radius of the circular arc.
+            n_terms (int): Number of terms in the series expansion (default: 10).
+    
+        Returns:
+            float: Estimated midpoint Xm in meters.
+        """
+        tau = A**2 / (2 * R**2)
+        sqrt_2tau = np.sqrt(2 * tau)
+        sum_series = 0.0
+    
+        for i in range(1, n_terms + 1):
+            sign = (-1)**(i + 1)
+            numerator = tau**(2 * i - 2)
+            denominator = (4 * i - 3) * np.math.factorial(2 * i - 2)
+            sum_series += sign * (numerator / denominator)
+    
+        Xm = 0.5 * A * sqrt_2tau * sum_series
+        return Xm
+
+    @staticmethod
+    def Xm_convergence(A, R, max_terms=10):
+        """
+        Analyzes the convergence of the clothoid midpoint Xm by increasing the number of terms.
+    
+        Parameters:
+            A (float): Clothoid parameter.
+            R (float): Radius of the circular arc.
+            max_terms (int): Maximum number of terms to include in the analysis (default: 10).
+        """
+        print(f"{'Terms':>6} | {'X_m (m)':>12}")
+        print("-" * 22)
+    
+        previous = 0.0
+        contribution_third = None
+    
+        for n in range(1, max_terms + 1):
+            current = CircularTransition.compute_Xm(A, R, n_terms=n)
+            print(f"{n:6} | {current:12.9f}")
+            if n == 3:
+                contribution_third = current - previous
+            previous = current
+    
+        if contribution_third is not None:
+            print(f"\n[INFO] Contribution of 3rd term: {contribution_third:.9e} m")
+
+    @staticmethod
+    def compute_clothoid(A, R, tau, n_terms=10):
+        """
+        Computes the clothoid point (X, Y) at a given tau using series approximation.
+    
+        Parameters:
+            A (float): Clothoid parameter.
+            R (float): Radius of the circular arc.
+            tau (float): Normalized parameter τ = L² / (2A²), in [0, τ_f].
+            n_terms (int): Number of terms in the series.
+    
+        Returns:
+            (X, Y): Coordinates at the given τ.
+        """
+        sqrt_2tau = np.sqrt(2 * tau)
+        sum_X = 0.0
+        sum_Y = 0.0
+        for i in range(1, n_terms + 1):
+            sum_X += (-1)**(i + 1) * tau**(2 * i - 2) / ((4 * i - 3) * np.math.factorial(2 * i - 2))
+            sum_Y += (-1)**(i + 1) * tau**(2 * i - 1) / ((4 * i - 1) * np.math.factorial(2 * i - 1))
+    
+        X = A * sqrt_2tau * sum_X
+        Y = A * sqrt_2tau * sum_Y
+        return X, Y
+
+    @staticmethod
+    def clothoid_convergence(A, R, tau, max_terms=10):
+        """
+        Prints the convergence table for X(τ) and Y(τ) values of the clothoid.
+    
+        Parameters:
+            A (float): Clothoid parameter.
+            R (float): Radius of curvature.
+            tau (float): Evaluation point in [0, τ_f].
+            max_terms (int): Maximum number of terms to include in the series.
+        """
+        print(f"{'Terms':>5} | {'X(τ)':>12} | {'Y(τ)':>12}")
+        print("-" * 36)
+    
+        sqrt_2tau = np.sqrt(2 * tau)
+        for n in range(1, max_terms + 1):
+            sum_X = 0.0
+            sum_Y = 0.0
+            for i in range(1, n + 1):
+                base = tau**(2 * i - 2)
+                factorial_term = np.math.factorial(2 * i - 2)
+                sum_X += (-1)**(i - 1) * base / ((4 * i - 3) * factorial_term)
+                sum_Y += (-1)**(i + 1) * tau * base * (4 * i - 3) / ((4 * i - 1) * factorial_term)
+    
+            X = A * sqrt_2tau * sum_X
+            Y = A * sqrt_2tau * sum_Y
+            print(f"{n:>5} | {X:12.6f} | {Y:12.6f}")
+    
+    def add_clothoids(self, A1, A2, n_points=20):
+        print("\nComputing clothoid transition curves...")    
+    
+        # === Store input parameters ===
+        self.A1 = A1
+        self.A2 = A2
+        self.n_points = n_points
+    
+        # === Compute ΔR, L and tau ===
+        self.delta_R1 = self.compute_delta_R(A1, self.R)
+        self.delta_R2 = self.compute_delta_R(A2, self.R)
+        self.L1 = A1**2 / self.R
+        self.L2 = A2**2 / self.R
+        self.tau1 = self.L1 / (2 * self.R)
+        self.tau2 = self.L2 / (2 * self.R)
+    
+        # === Compute normals ===
         if self.is_clockwise:
-            direction = (1, -1) if is_entry else (-1, -1)
+            self.normal1 = np.array([-self.v1[1], self.v1[0]])   # Right of v1
+            self.normal2 = np.array([self.v2[1], -self.v2[0]])   # Right of v2
         else:
-            direction = (1, 1) if is_entry else (-1, 1)
-
-        x_local *= direction[0]
-        y_local *= direction[1]
-
-        return np.vstack((x_local, y_local)).T
+            self.normal1 = np.array([self.v1[1], -self.v1[0]])   # Left of v1
+            self.normal2 = np.array([-self.v2[1], self.v2[0]])   # Left of v2
     
-    def add_clothoids(self, A1, A2):
-        print("\nComputing clothoid transition curves...")
-    
-        # Local clothoid coordinates from Fresnel integrals
-        #clothoid_entry_local = self.compute_clothoid_coordinates(A1, is_entry=True)
-        #clothoid_exit_local = self.compute_clothoid_coordinates(A2, is_entry=False)
-    
-        # ENTRY clothoid: local system aligned with P0-P1
-        #mid_P0P1 = (self.P0 + self.P1) / 2
-        #theta_P0P1 = np.arctan2(self.P1[1] - self.P0[1], self.P1[0] - self.P0[0])
-        #R_entry = np.array([
-        #    [np.cos(theta_P0P1), -np.sin(theta_P0P1)],
-        #    [np.sin(theta_P0P1),  np.cos(theta_P0P1)]
-        #])
-        #self.clothoid_entry_global = (R_entry @ clothoid_entry_local.T).T + mid_P0P1
-    
-        # EXIT clothoid: local system aligned with P1-P2
-        #mid_P1P2 = (self.P1 + self.P2) / 2
-        #theta_P1P2 = np.arctan2(self.P2[1] - self.P1[1], self.P2[0] - self.P1[0])
-        #R_exit = np.array([
-        #    [np.cos(theta_P1P2), -np.sin(theta_P1P2)],
-        #    [np.sin(theta_P1P2),  np.cos(theta_P1P2)]
-        #])
-        #self.clothoid_exit_global = (R_exit @ clothoid_exit_local.T).T + mid_P1P2
-    
-        # Compute ΔR offsets
-        delta_R1 = self.compute_delta_R(A1, self.R)
-        delta_R2 = self.compute_delta_R(A2, self.R)
-    
-        # Normals (pointing toward the center of the curve)
-        if self.is_clockwise:
-            normal1 = np.array([-self.v1[1], self.v1[0]])   # Right of v1
-            normal2 = np.array([self.v2[1], -self.v2[0]])   # Right of v2
-        else:
-            normal1 = np.array([self.v1[1], -self.v1[0]])   # Left of v1
-            normal2 = np.array([-self.v2[1], self.v2[0]])   # Left of v2
-    
-        self.normal1 = normal1
-        self.normal2 = normal2
-    
-        # Parallel lines shifted from P1 along normals
-        P_offset1 = self.P1 + normal1 * (self.R + delta_R1)
-        P_offset2 = self.P1 + normal2 * (self.R + delta_R2)
-    
+        # === Parallel offset lines ===
+        P_offset1 = self.P1 + self.normal1 * (self.R + self.delta_R1)
+        P_offset2 = self.P1 + self.normal2 * (self.R + self.delta_R2)
         A_mat = np.column_stack((self.v1, -self.v2))
         b_vec = P_offset2 - P_offset1
     
         try:
             lambdas = np.linalg.solve(A_mat, b_vec)
-            O_star = P_offset1 + lambdas[0] * self.v1
-            self.O_star = O_star
-            self.offset_line1 = (O_star - self.R * self.v1, O_star + self.R * self.v1)
-            self.offset_line2 = (O_star - self.R * self.v2, O_star + self.R * self.v2)
-            print(f"[INFO] Corrected center O* computed: {O_star}")
+            self.O_star = P_offset1 + lambdas[0] * self.v1
+            self.offset_line1 = (self.O_star - self.R * self.v1, self.O_star + self.R * self.v1)
+            self.offset_line2 = (self.O_star - self.R * self.v2, self.O_star + self.R * self.v2)
+            print(f"[INFO] Corrected center O* computed: {self.O_star}")
         except np.linalg.LinAlgError:
             print("[ERROR] Unable to compute corrected center O*. Lines are parallel.")
             self.O_star = None
             self.offset_line1 = None
             self.offset_line2 = None 
-        
-        # === CORRECTED ARC ===
+    
+        # === Generate corrected arc ===
         if self.O_star is not None:
-            # Clothoid lengths and angles
-            L1 = A1**2 / self.R
-            L2 = A2**2 / self.R
-            tau1 = L1 / (2 * self.R)
-            tau2 = L2 / (2 * self.R)
-        
-            # Compute angles of the reversed normal vectors
+            theta_rad = np.radians(self.theta_deg)
+            if self.tau1 + self.tau2 > theta_rad:
+                print(f"[WARNING] Sum of clothoid deflections (τ₁ + τ₂ = {np.degrees(self.tau1 + self.tau2):.2f}°) exceeds arc angle θ = {self.theta_deg:.2f}°")
+    
             angle1 = np.arctan2(-self.normal1[1], -self.normal1[0])
             angle2 = np.arctan2(-self.normal2[1], -self.normal2[0])
-        
-            # Adjust angles by clothoid deflection
+    
             if self.is_clockwise:
-                theta_start = angle1 - tau1
-                theta_end = angle2 + tau2
+                theta_start = angle1 - self.tau1
+                theta_end = angle2 + self.tau2
             else:
-                theta_start = angle1 + tau1
-                theta_end = angle2 - tau2
-        
-            # Generate arc
+                theta_start = angle1 + self.tau1
+                theta_end = angle2 - self.tau2
+    
             theta_vals = np.linspace(theta_start, theta_end, 100)
             self.arc_x_star = self.O_star[0] + self.R * np.cos(theta_vals)
             self.arc_y_star = self.O_star[1] + self.R * np.sin(theta_vals)
-        
-            theta_star = theta_end - theta_start
-            print(f"[INFO] Corrected arc generated with angle θ* = {np.degrees(theta_star):.2f}°")
+    
+            self.theta_star = theta_end - theta_start
+            print(f"[INFO] Corrected arc generated with angle θ* = {np.degrees(self.theta_star):.2f}°")
         else:
             self.arc_x_star = None
             self.arc_y_star = None
+    
+        # === Compute entry clothoid points ===
+        self.Xm = self.compute_Xm(A1, self.R)
+        self.d_star = np.linalg.norm(self.O_star - self.P1)
+        self.L_total = np.sqrt(self.d_star**2 - (self.R + self.delta_R1)**2)
+    
+        self.T1_star = self.P1 + self.v1 * (self.L_total + self.Xm)
+        self.C1_star = np.array([self.arc_x_star[0], self.arc_y_star[0]])
 
+        # === Generate entry clothoid coordinates ===
+        tau_vals = np.linspace(0, self.tau1, self.n_points)
+        clothoid_global = []
+        
+        for tau in tau_vals:
+            x, y = self.compute_clothoid(self.A1, self.R, tau, n_terms=10)
+            pt = self.T1_star + x * self.v1 + y * self.normal1
+            clothoid_global.append(pt)
+        
+        self.clothoid_entry_global = np.array(clothoid_global)
 
     def plotClothoid(self):
-        #if self.clothoid_entry_global is None or self.clothoid_exit_global is None:
-        #    raise ValueError("Clothoids not computed. Call add_clothoids(A1, A2) first.")
-    
         fig = go.Figure()
     
         # Base geometry: arc and segments
-        fig.add_trace(go.Scatter(x=self.arc_x, y=self.arc_y, mode='lines', name='Arc', line=dict(color='blue')))
+        #fig.add_trace(go.Scatter(x=self.arc_x, y=self.arc_y, mode='lines', name='Arc', line=dict(color='blue')))
         fig.add_trace(go.Scatter(x=[self.P0[0], self.P1[0]], y=[self.P0[1], self.P1[1]],
                                  mode='lines', name='Segment P0-P1', line=dict(color='black', dash='dash')))
         fig.add_trace(go.Scatter(x=[self.P1[0], self.P2[0]], y=[self.P1[1], self.P2[1]],
                                  mode='lines', name='Segment P1-P2', line=dict(color='black', dash='dash')))
     
-        ## Clothoid curves
-        #fig.add_trace(go.Scatter(x=self.clothoid_entry_global[:, 0], y=self.clothoid_entry_global[:, 1],
-        #                         mode='lines', name='Entry Clothoid', line=dict(color='red', dash='dot')))
-        #fig.add_trace(go.Scatter(x=self.clothoid_exit_global[:, 0], y=self.clothoid_exit_global[:, 1],
-        #                         mode='lines', name='Exit Clothoid', line=dict(color='red', dash='dot')))
-    
-        # Reference points
-        labels = ['P0', 'P1', 'P2', 'O', 'T1', 'T2']
-        coords = [self.P0, self.P1, self.P2, self.O, self.T1, self.T2]
-        fig.add_trace(go.Scatter(
-            x=[pt[0] for pt in coords],
-            y=[pt[1] for pt in coords],
-            mode='markers+text',
-            marker=dict(size=8, color='darkred'),
-            text=labels,
-            textposition='top center',
-            name='Key Points'
-        ))
+        # # Reference points
+        # labels = ['P0', 'P1', 'P2', 'O', 'T1', 'T2']
+        # coords = [self.P0, self.P1, self.P2, self.O, self.T1, self.T2]
+        # fig.add_trace(go.Scatter(
+        #     x=[pt[0] for pt in coords],
+        #     y=[pt[1] for pt in coords],
+        #     mode='markers+text',
+        #     marker=dict(size=8, color='darkred'),
+        #     text=labels,
+        #     textposition='top center',
+        #     name='Key Points'
+        # ))
     
         # Corrected center O*
         if self.O_star is not None:
@@ -471,32 +547,32 @@ class CircularTransition:
                                      mode='markers+text',
                                      marker=dict(size=12, color='blue', symbol='x'),
                                      text=['O*'], textposition="top center", name='Corrected Center'))
+        # # Offset lines
+        # if self.offset_line1 is not None:
+        #     fig.add_trace(go.Scatter(x=[self.offset_line1[0][0], self.offset_line1[1][0]],
+        #                              y=[self.offset_line1[0][1], self.offset_line1[1][1]],
+        #                              mode='lines', line=dict(color='blue', dash='dot'), name='Offset Line 1'))
+        # if self.offset_line2 is not None:
+        #     fig.add_trace(go.Scatter(x=[self.offset_line2[0][0], self.offset_line2[1][0]],
+        #                              y=[self.offset_line2[0][1], self.offset_line2[1][1]],
+        #                              mode='lines', line=dict(color='blue', dash='dot'), name='Offset Line 2'))
     
-        # Offset lines
-        if self.offset_line1 is not None:
-            fig.add_trace(go.Scatter(x=[self.offset_line1[0][0], self.offset_line1[1][0]],
-                                     y=[self.offset_line1[0][1], self.offset_line1[1][1]],
-                                     mode='lines', line=dict(color='blue', dash='dot'), name='Offset Line 1'))
-        if self.offset_line2 is not None:
-            fig.add_trace(go.Scatter(x=[self.offset_line2[0][0], self.offset_line2[1][0]],
-                                     y=[self.offset_line2[0][1], self.offset_line2[1][1]],
-                                     mode='lines', line=dict(color='blue', dash='dot'), name='Offset Line 2'))
+        # # Tangent vectors
+        # fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.v1[0]],
+        #                           y=[self.P1[1], self.P1[1] + 10 * self.v1[1]],
+        #                           mode='lines+markers', name='v1', line=dict(color='orange')))
+        # fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.v2[0]],
+        #                           y=[self.P1[1], self.P1[1] + 10 * self.v2[1]],
+        #                           mode='lines+markers', name='v2', line=dict(color='orange')))
     
-        # Tangent vectors
-        fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.v1[0]],
-                                 y=[self.P1[1], self.P1[1] + 10 * self.v1[1]],
-                                 mode='lines+markers', name='v1', line=dict(color='orange')))
-        fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.v2[0]],
-                                 y=[self.P1[1], self.P1[1] + 10 * self.v2[1]],
-                                 mode='lines+markers', name='v2', line=dict(color='orange')))
-    
-        # Normal vectors
-        fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.normal1[0]],
-                                 y=[self.P1[1], self.P1[1] + 10 * self.normal1[1]],
-                                 mode='lines+markers', name='n1', line=dict(color='green')))
-        fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.normal2[0]],
-                                 y=[self.P1[1], self.P1[1] + 10 * self.normal2[1]],
-                                 mode='lines+markers', name='n2', line=dict(color='green')))
+        # # Normal vectors
+        # fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.normal1[0]],
+        #                           y=[self.P1[1], self.P1[1] + 10 * self.normal1[1]],
+        #                           mode='lines+markers', name='n1', line=dict(color='green')))
+        # fig.add_trace(go.Scatter(x=[self.P1[0], self.P1[0] + 10 * self.normal2[0]],
+        #                           y=[self.P1[1], self.P1[1] + 10 * self.normal2[1]],
+        #                           mode='lines+markers', name='n2', line=dict(color='green')))
+        
         # Corrected arc (computed from O*)
         if self.arc_x_star is not None and self.arc_y_star is not None:
             fig.add_trace(go.Scatter(
@@ -505,6 +581,23 @@ class CircularTransition:
                 mode='lines',
                 name='Corrected Arc (O*)',
                 line=dict(color='purple', dash='solid', width=3)
+            ))
+        if hasattr(self, "T1_star"):
+            fig.add_trace(go.Scatter(
+                x=[self.T1_star[0]], y=[self.T1_star[1]],
+                mode='markers+text',
+                marker=dict(size=10, color='blue'),
+                text=['T1*'], textposition="top center",
+                name='T1_star'
+            ))
+        
+        if hasattr(self, "C1_star"):
+            fig.add_trace(go.Scatter(
+                x=[self.C1_star[0]], y=[self.C1_star[1]],
+                mode='markers+text',
+                marker=dict(size=10, color='purple'),
+                text=['C1*'], textposition="top center",
+                name='C1_star'
             ))
     
         # Final layout
