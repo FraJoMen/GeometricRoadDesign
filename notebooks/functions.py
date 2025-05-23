@@ -688,7 +688,7 @@ class CircularTransition:
             ))
 
         # Final layout
-        fig.update_layout(title="Clothoid Transition with Corrected Center and Vectors",
+        fig.update_layout(title="Planimetric Transition with Clothoids",
                           xaxis_title="X", yaxis_title="Y", width=950, height=700, template="plotly_white")
         fig.update_xaxes(scaleanchor="y", scaleratio=1)
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
